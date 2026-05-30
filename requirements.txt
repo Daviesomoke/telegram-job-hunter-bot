@@ -5,8 +5,14 @@
 
 
 
-# FIX: unpinned versions (>=3.0) can pull breaking updates on every deploy.
-# Pinned to known-good versions for reproducible builds.
+
+# Pin pydantic and pydantic-core explicitly to versions that have
+# pre-built manylinux wheels on Render. Without this, pip tries to
+# compile pydantic-core from source using Rust/Cargo, which fails
+# on Render's free tier (read-only filesystem for Cargo cache).
+pydantic==2.10.6
+pydantic-core==2.27.2
+
 aiogram==3.7.0
 aiosqlite==0.20.0
 aiohttp==3.9.5

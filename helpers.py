@@ -3,8 +3,6 @@
 
 
 
-
-
 from scrapers.base import Job
 
 def format_job_message(job: Job) -> str:
@@ -19,3 +17,7 @@ def format_job_message(job: Job) -> str:
         f"{job.description[:150]}"
     )
     return msg
+
+def clean_keywords(text: str) -> str:
+    """Clean up keywords from user input"""
+    return text.strip().rstrip(",")

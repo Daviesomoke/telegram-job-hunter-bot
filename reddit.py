@@ -7,14 +7,6 @@
 
 
 
-
-
-
-
-
-
-
-
 import aiohttp
 from typing import List
 from .base import Job
@@ -36,15 +28,13 @@ async def fetch_reddit_jobs(subreddits: List[str]) -> List[Job]:
                         title = pdata.get("title", "")
                         if not title:
                             continue
-                        # Simple heuristic: only posts with "[hiring]" or "job" flair
                         if "[hiring]" not in title.lower() and "job" not in pdata.get("link_flair_text", "").lower():
                             continue
-                        # Basic extraction
                         job = Job(
-                            title=pdata.get("title", "Untitled"),
-                            company="",  # reddit often doesn't specify cleanly
+                            title=title,
+                            company="Reddit Job Post",
                             location=pdata.get("link_flair_text", "Remote"),
-                            remote=True if "remote" in title.lower() else False,
+                            remote="remote" in title.lower(),
                             url=pdata.get("url", ""),
                             description=pdata.get("selftext", "")[:200],
                             source=f"reddit/r/{sub}",

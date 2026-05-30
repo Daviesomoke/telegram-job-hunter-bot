@@ -5,6 +5,7 @@
 
 
 
+
 from dataclasses import dataclass, field
 from typing import List, Optional
 
@@ -20,6 +21,5 @@ class Job:
     source: str = "unknown"
 
     def to_hash(self) -> str:
-        # Simple deterministic hash for deduplication
         raw = f"{self.title}|{self.company}|{self.url}".lower()
         return str(hash(raw))

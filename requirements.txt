@@ -8,3 +8,4 @@ aiosqlite
 aiohttp
 feedparser
 apscheduler
+python-dotenv

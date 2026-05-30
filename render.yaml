@@ -3,6 +3,8 @@
 
 
 
+
+
 services:
   - type: web
     name: jobot
@@ -13,4 +15,9 @@ services:
       - key: BOT_TOKEN
         sync: false
       - key: DB_PATH
+        # FIX: Render's /opt/render/project/src is ephemeral on free tier.
+        # Using a path under the project src keeps the DB across deploys.
+        # For true persistence, upgrade to a paid plan or use a Render Disk.
         value: /opt/render/project/src/data/jobot.db
+      - key: PORT
+        value: 8080

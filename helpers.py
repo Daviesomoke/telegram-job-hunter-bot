@@ -3,6 +3,8 @@
 
 
 
+
+
 from scrapers.base import Job
 
 def format_job_message(job: Job) -> str:

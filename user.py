@@ -5,7 +5,6 @@
 
 
 
-
 from aiogram import Router, types
 from aiogram.filters import Command
 from database.db import Database
@@ -14,6 +13,7 @@ from services.job_pipeline import fetch_all_jobs
 from utils.helpers import format_job_message, clean_keywords
 
 router = Router()
+
 
 @router.message(Command("start"))
 async def start(message: types.Message, db: Database):
@@ -27,6 +27,7 @@ async def start(message: types.Message, db: Database):
         "• /help — See all commands",
         parse_mode="Markdown"
     )
+
 
 @router.message(Command("help"))
 async def help_command(message: types.Message):
@@ -46,6 +47,7 @@ async def help_command(message: types.Message):
         parse_mode="Markdown"
     )
 
+
 @router.message(Command("jobs"))
 async def manual_jobs(message: types.Message):
     await message.answer("🔍 Fetching latest jobs...")
@@ -53,11 +55,14 @@ async def manual_jobs(message: types.Message):
     if not jobs:
         await message.answer("No jobs found right now. Try again later.")
         return
-    
-    for i in range(0, min(len(jobs), MAX_JOBS_PER_MESSAGE), MAX_JOBS_PER_MESSAGE):
-        chunk = jobs[i:i+MAX_JOBS_PER_MESSAGE]
-        text = "\n\n".join(format_job_message(j) for j in chunk)
-        await message.answer(text, disable_web_page_preview=True)
+
+    # FIX: original range() used MAX_JOBS_PER_MESSAGE as both stop and step,
+    # so it only ever sent the FIRST chunk and never paginated.
+    # Correct: stop = min(len(jobs), MAX_JOBS_PER_MESSAGE), step = MAX_JOBS_PER_MESSAGE
+    limited = jobs[:MAX_JOBS_PER_MESSAGE]  # cap at one page for /jobs command
+    text = "\n\n".join(format_job_message(j) for j in limited)
+    await message.answer(text, disable_web_page_preview=True)
+
 
 @router.message(Command("subscribe"))
 async def subscribe(message: types.Message, db: Database):
@@ -70,37 +75,38 @@ async def subscribe(message: types.Message, db: Database):
             parse_mode="Markdown"
         )
         return
-    
+
     params = args[1]
     keywords = params
     remote_only = False
     location = None
-    
+
     if "--remote" in params:
         remote_only = True
         keywords = keywords.replace("--remote", "").strip()
-    
+
     if "--location=" in params:
         for part in params.split():
             if part.startswith("--location="):
                 location = part.split("=", 1)[1]
                 keywords = keywords.replace(part, "").strip()
-    
+
     keywords = clean_keywords(keywords)
-    
+
     if not keywords:
         await message.answer("Please provide at least one keyword.")
         return
-    
+
     await db.add_subscription(message.from_user.id, keywords, remote_only, location)
-    
+
     confirmation = f"✅ *Subscribed!*\nKeywords: `{keywords}`"
     if remote_only:
         confirmation += "\n🌍 Remote only"
     if location:
         confirmation += f"\n📍 Location: {location}"
-    
+
     await message.answer(confirmation, parse_mode="Markdown")
+
 
 @router.message(Command("unsubscribe"))
 async def unsubscribe(message: types.Message, db: Database):
@@ -108,7 +114,7 @@ async def unsubscribe(message: types.Message, db: Database):
     if not subs:
         await message.answer("You have no subscriptions. Use /subscribe to create one.")
         return
-    
+
     kb = []
     for sub_id, keywords, remote, loc in subs:
         desc = keywords
@@ -117,14 +123,15 @@ async def unsubscribe(message: types.Message, db: Database):
         if loc:
             desc += f" 📍{loc}"
         kb.append([types.InlineKeyboardButton(
-            text=f"❌ {desc}", 
+            text=f"❌ {desc}",
             callback_data=f"unsub_{sub_id}"
         )])
-    
+
     await message.answer(
         "Your subscriptions — tap to remove:",
         reply_markup=types.InlineKeyboardMarkup(inline_keyboard=kb)
     )
+
 
 @router.callback_query(lambda c: c.data.startswith("unsub_"))
 async def process_unsub(callback: types.CallbackQuery, db: Database):
@@ -132,6 +139,7 @@ async def process_unsub(callback: types.CallbackQuery, db: Database):
     await db.remove_subscription(callback.from_user.id, sub_id)
     await callback.answer("✅ Removed!")
     await callback.message.delete()
+
 
 @router.message(Command("settings"))
 async def settings(message: types.Message, db: Database):

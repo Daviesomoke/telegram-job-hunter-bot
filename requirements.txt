@@ -1,0 +1,10 @@
+
+
+
+
+
+aiogram>=3.0
+aiosqlite
+aiohttp
+feedparser
+apscheduler

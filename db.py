@@ -5,6 +5,8 @@
 
 
 
+
+import os
 import aiosqlite
 
 class Database:
@@ -12,6 +14,11 @@ class Database:
         self.db_path = db_path
 
     async def init(self):
+        # Ensure directory exists
+        db_dir = os.path.dirname(self.db_path)
+        if db_dir and not os.path.exists(db_dir):
+            os.makedirs(db_dir, exist_ok=True)
+        
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute("""
                 CREATE TABLE IF NOT EXISTS users (

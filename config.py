@@ -7,24 +7,42 @@
 
 
 
+
+
+
+
 import os
 from dotenv import load_dotenv
 
 load_dotenv()
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-DB_PATH = os.getenv("DB_PATH", "data/jobot.db")
+# ── Required ──────────────────────────────────────────────────────────────────
+BOT_TOKEN: str = os.getenv("BOT_TOKEN", "")
 
-REDDIT_SUBREDDITS = ["forhire", "remotejs", "PythonJobs", "devopsjobs"]
-REDDIT_USER_AGENT = "jobot/1.0"
+# ── Database ──────────────────────────────────────────────────────────────────
+DB_PATH: str = os.getenv("DB_PATH", "data/jobot.db")
 
-RSS_FEEDS = [
-    "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords=python&location=Worldwide&f_TPR=r86400",
-    "https://www.indeed.com/rss?q=remote+software+engineer&l=",
+# ── Job sources ───────────────────────────────────────────────────────────────
+REDDIT_SUBREDDITS: list[str] = [
+    "forhire",
+    "remotejs",
+    "PythonJobs",
+    "devopsjobs",
+    "cscareerquestions",
 ]
 
-FETCH_INTERVAL_MINUTES = 10
-MAX_JOBS_PER_MESSAGE = 5
+RSS_FEEDS: list[str] = [
+    # We Work Remotely — well-structured, reliable RSS
+    "https://weworkremotely.com/remote-jobs.rss",
+    # Remotive — remote tech jobs
+    "https://remotive.com/remote-jobs/feed",
+    # Stack Overflow Jobs RSS
+    "https://stackoverflow.com/jobs/feed?r=true",
+]
 
-# Render port
-PORT = int(os.getenv("PORT", 8080))
+# ── Behaviour ─────────────────────────────────────────────────────────────────
+FETCH_INTERVAL_MINUTES: int = int(os.getenv("FETCH_INTERVAL_MINUTES", "10"))
+MAX_JOBS_PER_MESSAGE: int = 5
+
+# ── Server ────────────────────────────────────────────────────────────────────
+PORT: int = int(os.getenv("PORT", "8080"))

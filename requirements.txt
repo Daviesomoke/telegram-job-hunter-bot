@@ -6,16 +6,25 @@
 
 
 
-# Pin pydantic and pydantic-core explicitly to versions that have
-# pre-built manylinux wheels on Render. Without this, pip tries to
-# compile pydantic-core from source using Rust/Cargo, which fails
-# on Render's free tier (read-only filesystem for Cargo cache).
+# Core bot framework
+aiogram==3.7.0
+
+# HTTP client (used by aiogram + reddit scraper)
+aiohttp==3.9.5
+
+# Async SQLite
+aiosqlite==0.20.0
+
+# RSS feed parsing
+feedparser==6.0.11
+
+# Job scheduler
+apscheduler==3.10.4
+
+# .env file support
+python-dotenv==1.0.1
+
+# Pydantic — pinned explicitly so pip uses pre-built wheels
+# and never tries to compile pydantic-core from source with Rust/Cargo
 pydantic==2.10.6
 pydantic-core==2.27.2
-
-aiogram==3.7.0
-aiosqlite==0.20.0
-aiohttp==3.9.5
-feedparser==6.0.11
-apscheduler==3.10.4
-python-dotenv==1.0.1

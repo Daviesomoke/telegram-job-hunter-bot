@@ -5,17 +5,16 @@
 
 
 
-# aiogram 3.7.0 requires pydantic >=2.4.1 and <2.8
-# pydantic 2.10.6 is outside that range — causes ResolutionImpossible
-# These versions are compatible AND have pre-built manylinux wheels (no Rust compile needed)
+# aiogram 3.7.0 requires pydantic >=2.4.1,<2.8
+# pydantic 2.7.4 requires pydantic-core==2.18.4 (exact — locked by pydantic itself)
+# DO NOT pin pydantic-core manually — pydantic pins it to an exact version internally
+# and any manual pin that differs will cause ResolutionImpossible.
+# pydantic-core 2.18.4 has a pre-built manylinux wheel so no Rust compile is needed.
 pydantic==2.7.4
-pydantic-core==2.20.1
- 
+
 aiogram==3.7.0
 aiosqlite==0.20.0
 aiohttp==3.9.5
 feedparser==6.0.11
 apscheduler==3.10.4
 python-dotenv==1.0.1
-
-

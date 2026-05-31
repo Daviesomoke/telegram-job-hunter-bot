@@ -5,11 +5,15 @@
 
 
 
+
+
+
 import asyncio
 import logging
+import re
 import feedparser
 from typing import List
-from .base import Job
+from base import Job
 
 logger = logging.getLogger(__name__)
 
@@ -28,12 +32,9 @@ async def fetch_rss_jobs(feed_urls: List[str]) -> List[Job]:
                 link = entry.get("link", "")
                 if not title or not link:
                     continue
-                summary = entry.get("summary", "")
-                # Strip basic HTML tags from summary
-                import re
-                summary = re.sub(r"<[^>]+>", " ", summary).strip()
-                location = entry.get("location", "") or entry.get("georss_point", "") or "Remote"
-                remote = "remote" in location.lower() or "remote" in title.lower() or "remote" in summary.lower()
+                summary = re.sub(r"<[^>]+>", " ", entry.get("summary", "")).strip()
+                location = entry.get("location", "") or "Remote"
+                remote = "remote" in location.lower() or "remote" in title.lower()
                 job = Job(
                     title=title,
                     company=_extract_company(entry),
@@ -45,9 +46,9 @@ async def fetch_rss_jobs(feed_urls: List[str]) -> List[Job]:
                 )
                 jobs.append(job)
         except asyncio.TimeoutError:
-            logger.warning(f"RSS feed timed out: {url}")
+            logger.warning(f"RSS timeout: {url}")
         except Exception as e:
-            logger.error(f"RSS feed error ({url}): {e}")
+            logger.error(f"RSS error ({url}): {e}")
     return jobs
 
 

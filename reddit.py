@@ -6,12 +6,10 @@
 
 
 
-
-
 import logging
 import aiohttp
 from typing import List
-from .base import Job
+from base import Job
 
 logger = logging.getLogger(__name__)
 REDDIT_BASE = "https://www.reddit.com/r/{sub}/new.json?limit=25"
@@ -19,7 +17,7 @@ REDDIT_BASE = "https://www.reddit.com/r/{sub}/new.json?limit=25"
 
 async def fetch_reddit_jobs(subreddits: List[str]) -> List[Job]:
     jobs = []
-    headers = {"User-Agent": "jobot/1.0 (job alert telegram bot)"}
+    headers = {"User-Agent": "jobot/1.0"}
     async with aiohttp.ClientSession(headers=headers) as session:
         for sub in subreddits:
             url = REDDIT_BASE.format(sub=sub)
@@ -29,7 +27,6 @@ async def fetch_reddit_jobs(subreddits: List[str]) -> List[Job]:
                         logger.warning(f"Reddit rate limited on r/{sub}")
                         continue
                     if resp.status != 200:
-                        logger.warning(f"Reddit r/{sub} returned {resp.status}")
                         continue
                     data = await resp.json()
                     for post in data["data"]["children"]:
@@ -38,12 +35,11 @@ async def fetch_reddit_jobs(subreddits: List[str]) -> List[Job]:
                         if not title:
                             continue
                         flair = pdata.get("link_flair_text", "") or ""
-                        # Only pick up hiring/job posts
                         if "[hiring]" not in title.lower() and "job" not in flair.lower():
                             continue
                         job = Job(
                             title=title,
-                            company=pdata.get("author", "Reddit Job Post"),
+                            company=pdata.get("author", "Reddit"),
                             location=flair if flair else "Remote",
                             remote="remote" in title.lower() or not flair,
                             url=f"https://reddit.com{pdata.get('permalink', '')}",
@@ -52,6 +48,5 @@ async def fetch_reddit_jobs(subreddits: List[str]) -> List[Job]:
                         )
                         jobs.append(job)
             except Exception as e:
-                logger.error(f"Reddit scraper error on r/{sub}: {e}")
-                continue
+                logger.error(f"Reddit error r/{sub}: {e}")
     return jobs

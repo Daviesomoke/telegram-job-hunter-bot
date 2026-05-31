@@ -7,8 +7,6 @@
 
 
 
-
-
 import os
 import logging
 import aiosqlite
@@ -24,9 +22,8 @@ class Database:
         db_dir = os.path.dirname(self.db_path)
         if db_dir:
             os.makedirs(db_dir, exist_ok=True)
-
         async with aiosqlite.connect(self.db_path) as db:
-            await db.execute("PRAGMA journal_mode=WAL")  # Better concurrent write performance
+            await db.execute("PRAGMA journal_mode=WAL")
             await db.execute("""
                 CREATE TABLE IF NOT EXISTS users (
                     user_id    INTEGER PRIMARY KEY,
@@ -51,7 +48,6 @@ class Database:
                     delivered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
-            # Auto-clean delivered jobs older than 30 days to keep DB small
             await db.execute("""
                 DELETE FROM delivered_jobs
                 WHERE delivered_at < datetime('now', '-30 days')
@@ -65,7 +61,6 @@ class Database:
                 "INSERT OR IGNORE INTO users (user_id, username) VALUES (?, ?)",
                 (user_id, username)
             )
-            # Update username in case they changed it
             await db.execute(
                 "UPDATE users SET username = ? WHERE user_id = ?",
                 (username, user_id)
@@ -76,8 +71,7 @@ class Database:
                                 remote_only: bool, location: str = None):
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute(
-                """INSERT INTO subscriptions (user_id, keywords, remote_only, location)
-                   VALUES (?, ?, ?, ?)""",
+                "INSERT INTO subscriptions (user_id, keywords, remote_only, location) VALUES (?, ?, ?, ?)",
                 (user_id, keywords, int(remote_only), location)
             )
             await db.commit()
@@ -119,15 +113,3 @@ class Database:
                 (job_hash,)
             )
             await db.commit()
-
-    async def get_user_count(self) -> int:
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.execute("SELECT COUNT(*) FROM users")
-            row = await cursor.fetchone()
-            return row[0] if row else 0
-
-    async def get_subscription_count(self) -> int:
-        async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.execute("SELECT COUNT(*) FROM subscriptions")
-            row = await cursor.fetchone()
-            return row[0] if row else 0

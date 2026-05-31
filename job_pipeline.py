@@ -5,23 +5,25 @@
 
 
 
+
+
+
 import asyncio
 import logging
 from aiogram import Bot
 from aiogram.exceptions import TelegramForbiddenError, TelegramBadRequest
 
-from database.db import Database
-from scrapers.reddit import fetch_reddit_jobs
-from scrapers.rss import fetch_rss_jobs
-from scrapers.base import Job
+from db import Database
+from reddit import fetch_reddit_jobs
+from rss import fetch_rss_jobs
+from base import Job
 from config import REDDIT_SUBREDDITS, RSS_FEEDS, MAX_JOBS_PER_MESSAGE
-from utils.helpers import format_job_message, chunk_list
+from helpers import format_job_message, chunk_list
 
 logger = logging.getLogger(__name__)
 
 
-async def fetch_all_jobs() -> list[Job]:
-    """Fetch jobs from all sources concurrently."""
+async def fetch_all_jobs() -> list:
     results = await asyncio.gather(
         fetch_reddit_jobs(REDDIT_SUBREDDITS),
         fetch_rss_jobs(RSS_FEEDS),
@@ -33,17 +35,15 @@ async def fetch_all_jobs() -> list[Job]:
             all_jobs.extend(res)
         elif isinstance(res, Exception):
             logger.error(f"Scraper error: {res}")
-    logger.info(f"Fetched {len(all_jobs)} raw jobs from all sources")
+    logger.info(f"Fetched {len(all_jobs)} raw jobs")
     return all_jobs
 
 
 async def process_and_send(bot: Bot, db: Database):
-    """Main pipeline: fetch → deduplicate → match → deliver."""
     try:
-        logger.info("Job pipeline started")
+        logger.info("Pipeline started")
         jobs = await fetch_all_jobs()
 
-        # Deduplicate against already-delivered jobs
         new_jobs = []
         for job in jobs:
             h = job.to_hash()
@@ -58,11 +58,9 @@ async def process_and_send(bot: Bot, db: Database):
         logger.info(f"{len(new_jobs)} new jobs to deliver")
         subs = await db.get_all_subscriptions()
         if not subs:
-            logger.info("No subscribers — nothing to send")
             return
 
-        # Match jobs to each subscriber's preferences
-        user_jobs: dict[int, list[Job]] = {}
+        user_jobs: dict = {}
         for user_id, keywords, remote_only, location in subs:
             matched = []
             for job in new_jobs:
@@ -78,9 +76,6 @@ async def process_and_send(bot: Bot, db: Database):
             if matched:
                 user_jobs[user_id] = matched
 
-        logger.info(f"Sending to {len(user_jobs)} subscribers")
-
-        # Deliver in chunks, respecting Telegram rate limits
         for user_id, jobs_list in user_jobs.items():
             for chunk in chunk_list(jobs_list, MAX_JOBS_PER_MESSAGE):
                 text = "\n\n".join(format_job_message(j) for j in chunk)
@@ -91,16 +86,14 @@ async def process_and_send(bot: Bot, db: Database):
                         parse_mode="HTML",
                         disable_web_page_preview=True,
                     )
-                    await asyncio.sleep(0.05)  # ~20 msg/s — within Telegram limits
+                    await asyncio.sleep(0.05)
                 except TelegramForbiddenError:
-                    # User blocked the bot — skip silently
-                    logger.info(f"User {user_id} has blocked the bot, skipping")
+                    logger.info(f"User {user_id} blocked the bot")
                 except TelegramBadRequest as e:
-                    logger.warning(f"Bad request for user {user_id}: {e}")
+                    logger.warning(f"Bad request for {user_id}: {e}")
                 except Exception as e:
-                    logger.error(f"Failed to send to {user_id}: {e}")
+                    logger.error(f"Send failed for {user_id}: {e}")
 
-        logger.info("Job pipeline complete")
-
+        logger.info("Pipeline complete")
     except Exception as e:
-        logger.error(f"Pipeline critical error: {e}", exc_info=True)
+        logger.error(f"Pipeline error: {e}", exc_info=True)

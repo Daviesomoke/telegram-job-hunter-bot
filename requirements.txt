@@ -4,7 +4,6 @@
 
 
 
-
 # aiogram 3.7.0 requires pydantic >=2.4.1,<2.8
 # pydantic 2.7.4 requires pydantic-core==2.18.4 (exact — locked by pydantic itself)
 # DO NOT pin pydantic-core manually — pydantic pins it to an exact version internally

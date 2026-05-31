@@ -5,26 +5,17 @@
 
 
 
-
-# Core bot framework
+# aiogram 3.7.0 requires pydantic >=2.4.1 and <2.8
+# pydantic 2.10.6 is outside that range — causes ResolutionImpossible
+# These versions are compatible AND have pre-built manylinux wheels (no Rust compile needed)
+pydantic==2.7.4
+pydantic-core==2.20.1
+ 
 aiogram==3.7.0
-
-# HTTP client (used by aiogram + reddit scraper)
-aiohttp==3.9.5
-
-# Async SQLite
 aiosqlite==0.20.0
-
-# RSS feed parsing
+aiohttp==3.9.5
 feedparser==6.0.11
-
-# Job scheduler
 apscheduler==3.10.4
-
-# .env file support
 python-dotenv==1.0.1
 
-# Pydantic — pinned explicitly so pip uses pre-built wheels
-# and never tries to compile pydantic-core from source with Rust/Cargo
-pydantic==2.10.6
-pydantic-core==2.27.2
+

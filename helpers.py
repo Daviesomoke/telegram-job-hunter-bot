@@ -14,17 +14,24 @@ from base import Job
 
 
 def format_job_message(job: Job) -> str:
-    tags = " · ".join(job.tech_stack) if job.tech_stack else ""
-    location_str = "🌍 Remote" if job.remote else f"📍 {job.location}"
-    title = html.escape(job.title)
+    """Format a job into a clean, human-looking Telegram message."""
+    title   = html.escape(job.title)
     company = html.escape(job.company or "Unknown")
-    description = html.escape(job.description[:200]) if job.description else ""
-    lines = [f"<b>🚀 {title}</b>", f"🏢 {company}", location_str]
+    desc    = html.escape(job.description[:180]).strip() if job.description else ""
+    tags    = ", ".join(job.tech_stack[:5]) if job.tech_stack else ""
+
+    location = "Remote" if job.remote else job.location
+
+    lines = [f"<b>{title}</b>"]
+    lines.append(f"{company}  |  {location}")
+
     if tags:
-        lines.append(f"🛠 {html.escape(tags)}")
-    if description:
-        lines.append(f"<i>{description}…</i>")
-    lines.append(f"🔗 <a href='{job.url}'>View Job</a>")
+        lines.append(tags)
+    if desc:
+        lines.append(f"\n{desc}")
+
+    lines.append(f'\n<a href="{job.url}">View job</a>  |  {job.source}')
+
     return "\n".join(lines)
 
 

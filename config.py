@@ -7,6 +7,8 @@
 
 
 
+
+
 import os
 from dotenv import load_dotenv
 
@@ -17,6 +19,64 @@ BOT_TOKEN: str = os.getenv("BOT_TOKEN", "")
 
 # ── Database ──────────────────────────────────────────────────────────────────
 DB_PATH: str = os.getenv("DB_PATH", "data/jobot.db")
+
+
+# ── Role categories shown on /subscribe ───────────────────────────────────────
+# These appear as tap-to-pick buttons in the subscribe flow.
+# Categories are shown as headers, roles as buttons.
+ROLE_CATEGORIES: dict = {
+    "Frontend": [
+        "Frontend Developer",
+        "React Developer",
+        "Vue Developer",
+        "Angular Developer",
+        "Next.js Developer",
+        "UI Developer",
+        "JavaScript Developer",
+        "TypeScript Developer",
+    ],
+    "Backend": [
+        "Backend Developer",
+        "Node.js Developer",
+        "Python Developer",
+        "Django Developer",
+        "FastAPI Developer",
+        "PHP Developer",
+        "Java Developer",
+        "Go Developer",
+    ],
+    "Full Stack": [
+        "Full Stack Developer",
+        "Full Stack Engineer",
+        "MERN Stack Developer",
+        "MEAN Stack Developer",
+    ],
+    "DevOps / Cloud": [
+        "DevOps Engineer",
+        "Cloud Engineer",
+        "AWS Engineer",
+        "Platform Engineer",
+        "Site Reliability Engineer",
+        "Infrastructure Engineer",
+        "CI/CD Engineer",
+    ],
+    "Systems / Linux": [
+        "Linux Administrator",
+        "System Administrator",
+        "Linux Engineer",
+        "Network Engineer",
+        "IT Administrator",
+        "Unix Administrator",
+        "Windows Administrator",
+    ],
+    "Software Engineering": [
+        "Software Engineer",
+        "Software Developer",
+        "Mobile Developer",
+        "iOS Developer",
+        "Android Developer",
+    ],
+}
 
 # ── Target job roles ──────────────────────────────────────────────────────────
 TARGET_ROLES = [

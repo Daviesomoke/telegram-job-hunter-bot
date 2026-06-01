@@ -191,9 +191,19 @@ REDDIT_SUBREDDITS = [
 
 # ── RSS feeds ─────────────────────────────────────────────────────────────────
 RSS_FEEDS: list[str] = [
+    # We Work Remotely
     "https://weworkremotely.com/remote-jobs.rss",
+    # Remotive
     "https://remotive.com/remote-jobs/feed",
+    # Stack Overflow
     "https://stackoverflow.com/jobs/feed?r=true",
+    # NoDesk — curated remote jobs
+    "https://nodesk.co/remote-jobs/feed/",
+    # Monster — role-specific remote searches
+    "https://feeds.monster.com/rss/search?q=remote+software+developer&where=remote",
+    "https://feeds.monster.com/rss/search?q=remote+frontend+developer&where=remote",
+    "https://feeds.monster.com/rss/search?q=remote+devops+engineer&where=remote",
+    "https://feeds.monster.com/rss/search?q=remote+linux+administrator&where=remote",
 ]
 
 # ── Behaviour ─────────────────────────────────────────────────────────────────

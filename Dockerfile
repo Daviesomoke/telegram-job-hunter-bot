@@ -34,7 +34,8 @@ COPY --from=builder /install /usr/local
 
 # Copy all flat source files
 COPY main.py config.py db.py base.py helpers.py \
-     reddit.py rss.py job_pipeline.py user.py ./
+     reddit.py rss.py job_pipeline.py user.py \
+     scraper_remoteok.py scraper_himalayas.py scraper_lever.py ./
 
 RUN mkdir -p /app/data
 

@@ -6,6 +6,8 @@
 
 
 
+
+
 import logging
 from aiogram import Router, types, F
 from aiogram.filters import Command, CommandStart
@@ -22,9 +24,56 @@ router = Router()
 
 
 class SubscribeFlow(StatesGroup):
-    picking_role     = State()
+    picking_roles    = State()
     picking_location = State()
-    confirming       = State()
+    typing_location  = State()
+
+
+# ── helpers ───────────────────────────────────────────────────────────────────
+
+def build_role_keyboard(selected: list[str]) -> types.InlineKeyboardMarkup:
+    """Build the role picker keyboard, ticked roles show a checkmark."""
+    kb = []
+    for category, roles in ROLE_CATEGORIES.items():
+        kb.append([types.InlineKeyboardButton(
+            text=category,
+            callback_data="noop"
+        )])
+        row = []
+        for role in roles:
+            tick  = "✓ " if role in selected else ""
+            row.append(types.InlineKeyboardButton(
+                text=f"{tick}{role}",
+                callback_data=f"toggle_{role}"
+            ))
+            if len(row) == 2:
+                kb.append(row)
+                row = []
+        if row:
+            kb.append(row)
+
+    # Bottom action bar
+    if selected:
+        kb.append([
+            types.InlineKeyboardButton(
+                text=f"Continue with {len(selected)} role(s)",
+                callback_data="roles_done"
+            )
+        ])
+        kb.append([
+            types.InlineKeyboardButton(text="Clear all", callback_data="roles_clear"),
+            types.InlineKeyboardButton(text="Cancel",    callback_data="sub_cancel"),
+        ])
+    else:
+        kb.append([types.InlineKeyboardButton(text="Cancel", callback_data="sub_cancel")])
+
+    return types.InlineKeyboardMarkup(inline_keyboard=kb)
+
+
+def selected_roles_text(selected: list[str]) -> str:
+    if not selected:
+        return "None selected yet — tap roles below to pick them."
+    return "Selected: " + ", ".join(selected)
 
 
 # ── /start ────────────────────────────────────────────────────────────────────
@@ -37,10 +86,10 @@ async def cmd_start(message: types.Message, db: Database, state: FSMContext):
     await message.answer(
         f"Hey {name}, welcome to Job Hunter.\n\n"
         "I track remote tech jobs across Reddit, RemoteOK, Himalayas, Lever and more "
-        "— then ping you only when something matches what you're looking for.\n\n"
+        "then ping you only when something matches what you're looking for.\n\n"
         "Commands:\n"
         "/jobs — browse latest openings\n"
-        "/subscribe — set up a job alert\n"
+        "/subscribe — set up job alerts\n"
         "/settings — see your active alerts\n"
         "/unsubscribe — remove an alert\n"
         "/help — how everything works"
@@ -54,7 +103,7 @@ async def cmd_help(message: types.Message):
     await message.answer(
         "Job Hunter monitors 100+ sources every 10 minutes and sends "
         "you only the jobs that match your role and preferences.\n\n"
-        "/subscribe — pick a role, set remote or location filter, done\n"
+        "/subscribe — pick as many roles as you want, set a location, done\n"
         "/jobs — see what's available right now\n"
         "/settings — check what alerts you have running\n"
         "/unsubscribe — delete any alert\n\n"
@@ -83,48 +132,24 @@ async def cmd_jobs(message: types.Message):
         parse_mode="HTML",
         disable_web_page_preview=True,
     )
-
     if len(jobs) > MAX_JOBS_PER_MESSAGE:
         await message.answer(
-            f"Use /subscribe to get all matching results sent to you automatically."
+            "Use /subscribe to get all matching results sent automatically."
         )
 
 
-# ── /subscribe — Step 1: pick a role ─────────────────────────────────────────
+# ── /subscribe — Step 1: pick roles (multi-select) ────────────────────────────
 
 @router.message(Command("subscribe"))
 async def cmd_subscribe(message: types.Message, state: FSMContext):
     await state.clear()
-
-    # Build role buttons from config categories
-    kb = []
-    for category, roles in ROLE_CATEGORIES.items():
-        # Category header button (not tappable, just a label)
-        kb.append([types.InlineKeyboardButton(
-            text=f"--- {category} ---",
-            callback_data="noop"
-        )])
-        # Role buttons in pairs
-        row = []
-        for role in roles:
-            row.append(types.InlineKeyboardButton(
-                text=role,
-                callback_data=f"role_{role}"
-            ))
-            if len(row) == 2:
-                kb.append(row)
-                row = []
-        if row:
-            kb.append(row)
-
-    kb.append([types.InlineKeyboardButton(text="Cancel", callback_data="sub_cancel")])
-
+    await state.update_data(selected=[])
     await message.answer(
-        "What kind of role are you looking for?\n"
-        "Tap one to set up an alert for it.",
-        reply_markup=types.InlineKeyboardMarkup(inline_keyboard=kb)
+        "Tap as many roles as you want. Tap again to deselect.\n"
+        "When you're done, tap Continue.",
+        reply_markup=build_role_keyboard([])
     )
-    await state.set_state(SubscribeFlow.picking_role)
+    await state.set_state(SubscribeFlow.picking_roles)
 
 
 @router.callback_query(F.data == "noop")
@@ -132,115 +157,153 @@ async def cb_noop(callback: types.CallbackQuery):
     await callback.answer()
 
 
-# ── Step 2: pick remote or location ──────────────────────────────────────────
+@router.callback_query(F.data.startswith("toggle_"), SubscribeFlow.picking_roles)
+async def cb_toggle_role(callback: types.CallbackQuery, state: FSMContext):
+    role = callback.data.replace("toggle_", "")
+    data = await state.get_data()
+    selected: list = list(data.get("selected", []))
 
-@router.callback_query(F.data.startswith("role_"), SubscribeFlow.picking_role)
-async def cb_role_picked(callback: types.CallbackQuery, state: FSMContext):
-    role = callback.data.replace("role_", "")
-    await state.update_data(role=role)
+    if role in selected:
+        selected.remove(role)
+        await callback.answer(f"Removed: {role}")
+    else:
+        selected.append(role)
+        await callback.answer(f"Added: {role}")
+
+    await state.update_data(selected=selected)
+
+    # Update keyboard in place
+    try:
+        await callback.message.edit_text(
+            f"Tap as many roles as you want. Tap again to deselect.\n"
+            f"When you're done, tap Continue.\n\n"
+            f"{selected_roles_text(selected)}",
+            reply_markup=build_role_keyboard(selected)
+        )
+    except Exception:
+        pass  # message unchanged, ignore
+
+
+@router.callback_query(F.data == "roles_clear", SubscribeFlow.picking_roles)
+async def cb_roles_clear(callback: types.CallbackQuery, state: FSMContext):
+    await state.update_data(selected=[])
     await callback.message.edit_text(
-        f"Role: <b>{role}</b>\n\n"
+        "Tap as many roles as you want. Tap again to deselect.\n"
+        "When you're done, tap Continue.\n\n"
+        "None selected yet — tap roles below to pick them.",
+        reply_markup=build_role_keyboard([])
+    )
+    await callback.answer("Cleared")
+
+
+# ── Step 2: pick location ─────────────────────────────────────────────────────
+
+@router.callback_query(F.data == "roles_done", SubscribeFlow.picking_roles)
+async def cb_roles_done(callback: types.CallbackQuery, state: FSMContext):
+    data     = await state.get_data()
+    selected = data.get("selected", [])
+
+    if not selected:
+        await callback.answer("Pick at least one role first.", show_alert=True)
+        return
+
+    roles_text = "\n".join(f"  {r}" for r in selected)
+    await callback.message.edit_text(
+        f"Roles selected:\n{roles_text}\n\n"
         "Where do you want to work?",
-        parse_mode="HTML",
         reply_markup=types.InlineKeyboardMarkup(inline_keyboard=[
-            [types.InlineKeyboardButton(text="Remote only", callback_data="loc_remote")],
-            [types.InlineKeyboardButton(text="Worldwide (remote + onsite)", callback_data="loc_worldwide")],
-            [types.InlineKeyboardButton(text="Type a city or country", callback_data="loc_custom")],
-            [types.InlineKeyboardButton(text="Back", callback_data="sub_back_role")],
+            [types.InlineKeyboardButton(text="Remote only",             callback_data="loc_remote")],
+            [types.InlineKeyboardButton(text="Worldwide (any location)", callback_data="loc_worldwide")],
+            [types.InlineKeyboardButton(text="Specific city or country", callback_data="loc_custom")],
+            [types.InlineKeyboardButton(text="Back",                    callback_data="back_to_roles")],
         ])
     )
     await state.set_state(SubscribeFlow.picking_location)
     await callback.answer()
 
 
-@router.callback_query(F.data == "sub_back_role")
-async def cb_back_to_role(callback: types.CallbackQuery, state: FSMContext):
-    await state.set_state(SubscribeFlow.picking_role)
-    await cmd_subscribe(callback.message, state)
+@router.callback_query(F.data == "back_to_roles")
+async def cb_back_to_roles(callback: types.CallbackQuery, state: FSMContext):
+    data     = await state.get_data()
+    selected = data.get("selected", [])
+    await callback.message.edit_text(
+        "Tap as many roles as you want. Tap again to deselect.\n"
+        "When you're done, tap Continue.\n\n"
+        f"{selected_roles_text(selected)}",
+        reply_markup=build_role_keyboard(selected)
+    )
+    await state.set_state(SubscribeFlow.picking_roles)
     await callback.answer()
 
 
 @router.callback_query(F.data.startswith("loc_"), SubscribeFlow.picking_location)
-async def cb_location_picked(callback: types.CallbackQuery, state: FSMContext):
-    loc_choice = callback.data.replace("loc_", "")
+async def cb_location_picked(callback: types.CallbackQuery, state: FSMContext, db: Database):
+    choice = callback.data.replace("loc_", "")
 
-    if loc_choice == "custom":
+    if choice == "custom":
         await callback.message.edit_text(
-            "Type the city or country you want to filter by.\n"
-            "Example: London, Kenya, Germany"
+            "Type the city or country you want.\n"
+            "Example: London, Kenya, Germany, New York"
         )
-        await state.set_state(SubscribeFlow.confirming)
+        await state.set_state(SubscribeFlow.typing_location)
         await callback.answer()
         return
 
-    remote_only = loc_choice == "remote"
-    location    = None if loc_choice in ("remote", "worldwide") else None
-    await _confirm_subscription(callback.message, state, remote_only, location)
+    remote_only = choice == "remote"
+    location    = None
+    await _save_all_subscriptions(callback.message, state, db,
+                                   callback.from_user.id, remote_only, location)
     await callback.answer()
 
 
-@router.message(SubscribeFlow.confirming)
-async def receive_custom_location(message: types.Message, state: FSMContext):
+@router.message(SubscribeFlow.typing_location)
+async def receive_custom_location(message: types.Message, state: FSMContext, db: Database):
     location = message.text.strip()
-    await _confirm_subscription(message, state, remote_only=False, location=location)
+    await _save_all_subscriptions(message, state, db,
+                                   message.from_user.id, remote_only=False, location=location)
 
 
-async def _confirm_subscription(message, state: FSMContext, remote_only: bool, location):
-    data = await state.get_data()
-    role = data.get("role", "")
+# ── save all selected roles as individual subscriptions ───────────────────────
 
-    loc_label = "Remote only" if remote_only else (location or "Worldwide")
+async def _save_all_subscriptions(message, state: FSMContext, db: Database,
+                                   user_id: int, remote_only: bool, location):
+    data     = await state.get_data()
+    selected = data.get("selected", [])
 
-    await message.answer(
-        f"Role: <b>{role}</b>\n"
-        f"Location: {loc_label}\n\n"
-        "Set up this alert?",
-        parse_mode="HTML",
-        reply_markup=types.InlineKeyboardMarkup(inline_keyboard=[
-            [
-                types.InlineKeyboardButton(text="Yes, create alert", callback_data="sub_confirm"),
-                types.InlineKeyboardButton(text="No, cancel",        callback_data="sub_cancel"),
-            ]
-        ])
-    )
-    await state.update_data(remote_only=remote_only, location=location)
-    await state.set_state(SubscribeFlow.confirming)
+    existing_subs = await db.get_subscriptions(user_id)
+    existing_kws  = [kw.lower() for _, kw, _, _ in existing_subs]
 
+    saved    = []
+    skipped  = []
 
-@router.callback_query(F.data == "sub_confirm")
-async def cb_confirm_subscription(callback: types.CallbackQuery, state: FSMContext, db: Database):
-    data        = await state.get_data()
-    role        = data.get("role", "")
-    remote_only = data.get("remote_only", True)
-    location    = data.get("location")
+    for role in selected:
+        if role.lower() in existing_kws:
+            skipped.append(role)
+        else:
+            await db.add_subscription(user_id, role, remote_only, location)
+            saved.append(role)
 
-    # Check for duplicates
-    existing = await db.get_subscriptions(callback.from_user.id)
-    for _, kw, _, _ in existing:
-        if kw.lower() == role.lower():
-            await callback.message.edit_text(
-                f"You already have an alert for <b>{role}</b>. "
-                "Check /settings to see all your alerts.",
-                parse_mode="HTML"
-            )
-            await state.clear()
-            await callback.answer()
-            return
-
-    await db.add_subscription(callback.from_user.id, role, remote_only, location)
-
-    loc_label = "Remote only" if remote_only else (location or "Worldwide")
-    await callback.message.edit_text(
-        f"Alert created.\n\n"
-        f"Role: <b>{role}</b>\n"
-        f"Location: {loc_label}\n\n"
-        "I'll message you as soon as matching jobs come in. "
-        "Use /subscribe again to add more roles.",
-        parse_mode="HTML"
-    )
     await state.clear()
-    await callback.answer()
 
+    loc_label = "remote only" if remote_only else (location or "worldwide")
+
+    lines = []
+    if saved:
+        lines.append(f"<b>Alerts created</b> ({loc_label}):\n")
+        for r in saved:
+            lines.append(f"  {r}")
+    if skipped:
+        lines.append(f"\nAlready active (skipped):\n")
+        for r in skipped:
+            lines.append(f"  {r}")
+
+    lines.append("\nI'll message you as soon as matching jobs come in.")
+    lines.append("Use /subscribe again to add more roles.")
+
+    await message.answer("\n".join(lines), parse_mode="HTML")
+
+
+# ── cancel ────────────────────────────────────────────────────────────────────
 
 @router.callback_query(F.data == "sub_cancel")
 async def cb_cancel(callback: types.CallbackQuery, state: FSMContext):
@@ -306,11 +369,10 @@ async def cmd_settings(message: types.Message, db: Database):
     await message.answer("\n".join(lines), parse_mode="HTML")
 
 
-# ── catch unknown messages ────────────────────────────────────────────────────
+# ── catch unknown ─────────────────────────────────────────────────────────────
 
 @router.message()
 async def unknown_message(message: types.Message, state: FSMContext):
-    current = await state.get_state()
-    if current:
-        return  # FSM is handling it
+    if await state.get_state():
+        return
     await message.answer("Try /help to see what I can do.")
